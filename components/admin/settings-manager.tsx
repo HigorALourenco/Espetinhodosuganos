@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { LocalStorageService } from "@/lib/local-storage"
+import { DatabaseService } from "@/lib/database-service"
 import type { Settings } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,7 +30,7 @@ export default function SettingsManager({ settings, onUpdate }: SettingsManagerP
     e.preventDefault()
 
     try {
-      LocalStorageService.saveSettings(formData)
+      await DatabaseService.saveSettings(formData)
       onUpdate()
       alert("Configurações salvas com sucesso!")
     } catch (error) {

@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { LocalStorageService } from "@/lib/local-storage"
 import { GoogleUploadService } from "@/lib/google-upload"
 import type { Settings } from "@/types"
 import type { AppearanceSettings } from "@/lib/local-storage"
@@ -13,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Upload, ImageIcon, Palette, Monitor, Trash2, Loader2 } from "lucide-react"
 import Image from "next/image"
+import { DatabaseService } from "@/lib/database-service"
 
 interface AppearanceManagerProps {
   settings: Settings | null
@@ -46,9 +46,9 @@ export default function AppearanceManager({ settings, appearance, onUpdate }: Ap
       setUploadProgress(100)
 
       if (type === "logo") {
-        LocalStorageService.saveSettings({ logo_url: imageUrl })
+        await DatabaseService.saveSettings({ logo_url: imageUrl })
       } else {
-        LocalStorageService.saveAppearance({ background_image: imageUrl })
+        await DatabaseService.saveAppearance({ background_image: imageUrl })
       }
 
       onUpdate()
@@ -74,17 +74,17 @@ export default function AppearanceManager({ settings, appearance, onUpdate }: Ap
     event.target.value = ""
   }
 
-  const handleOpacityChange = (value: number[]) => {
-    LocalStorageService.saveAppearance({ background_opacity: value[0] })
+  const handleOpacityChange = async (value: number[]) => {
+    await DatabaseService.saveAppearance({ background_opacity: value[0] })
     onUpdate()
   }
 
   const removeImage = async (type: "logo" | "background") => {
     if (confirm(`Tem certeza que deseja remover ${type === "logo" ? "o logo" : "a imagem de fundo"}?`)) {
       if (type === "logo") {
-        LocalStorageService.saveSettings({ logo_url: null })
+        await DatabaseService.saveSettings({ logo_url: null })
       } else {
-        LocalStorageService.saveAppearance({ background_image: null })
+        await DatabaseService.saveAppearance({ background_image: null })
       }
       onUpdate()
     }

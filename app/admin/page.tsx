@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LocalStorageService } from "@/lib/local-storage"
-import { useRealtimeSync } from "@/hooks/use-realtime-sync"
+import { DatabaseService } from "@/lib/database-service"
+import { useSupabaseRealtime } from "@/hooks/use-supabase-realtime"
+import { isSupabaseEnabled } from "@/lib/supabase"
 import type { Category, Product, Settings } from "@/types"
-import type { AppearanceSettings } from "@/lib/local-storage"
+import type { AppearanceSettings } from "@/lib/database-service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import ProductsManager from "@/components/admin/products-manager"
 import SettingsManager from "@/components/admin/settings-manager"
 import AppearanceManager from "@/components/admin/appearance-manager"
-import { Shield, Eye, EyeOff, WifiOff, Zap } from "lucide-react"
+import { Shield, Eye, EyeOff, WifiOff, Database, HardDrive } from "lucide-react"
 
 export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -25,8 +26,8 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loginError, setLoginError] = useState("")
 
-  // Hook de sincronização em tempo real
-  const { connected, lastUpdate, syncProducts, syncSettings, syncAppearance } = useRealtimeSync()
+  // Hook de tempo real com Supabase
+  const { connected, lastUpdate } = useSupabaseRealtime()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -34,12 +35,22 @@ export default function AdminPage() {
     }
   }, [isAuthenticated])
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
-      setCategories(LocalStorageService.getCategories())
-      setProducts(LocalStorageService.getProducts())
-      setSettings(LocalStorageService.getSettings())
-      setAppearance(LocalStorageService.getAppearance())
+      console.log("📊 Carregando dados do admin...")
+
+      const [categoriesData, productsData, settingsData, appearanceData] = await Promise.all([
+        DatabaseService.getCategories(),
+        DatabaseService.getProducts(),
+        DatabaseService.getSettings(),
+        DatabaseService.getAppearance(),
+      ])
+
+      setCategories(categoriesData)
+      setProducts(productsData)
+      setSettings(settingsData)
+      setAppearance(appearanceData)
+
       console.log("✅ Dados do admin carregados")
     } catch (error) {
       console.error("❌ Erro ao carregar dados do admin:", error)
@@ -67,31 +78,6 @@ export default function AdminPage() {
     setUsername("")
     setPassword("")
     console.log("👋 Logout realizado")
-  }
-
-  // Função para sincronizar dados após mudanças
-  const handleDataUpdate = async (type: "products" | "settings" | "appearance") => {
-    try {
-      loadData() // Recarregar dados locais primeiro
-
-      // Sincronizar com outros clientes
-      switch (type) {
-        case "products":
-          const updatedProducts = LocalStorageService.getProducts()
-          await syncProducts(updatedProducts)
-          break
-        case "settings":
-          const updatedSettings = LocalStorageService.getSettings()
-          await syncSettings(updatedSettings)
-          break
-        case "appearance":
-          const updatedAppearance = LocalStorageService.getAppearance()
-          await syncAppearance(updatedAppearance)
-          break
-      }
-    } catch (error) {
-      console.error("❌ Erro na sincronização:", error)
-    }
   }
 
   if (!isAuthenticated) {
@@ -169,25 +155,36 @@ export default function AdminPage() {
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-bold text-yellow-400 mb-2">Painel Administrativo</h1>
-            <p className="text-gray-300">Gerencie seu cardápio com sincronização em tempo real</p>
+            <p className="text-gray-300">
+              {isSupabaseEnabled ? "Sincronização global com Supabase" : "Modo local com localStorage"}
+            </p>
           </div>
           <div className="flex items-center space-x-4">
             {/* Status de Conexão */}
             <Badge
-              variant={connected ? "default" : "destructive"}
+              variant={connected ? "default" : "secondary"}
               className={`${
-                connected ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                connected
+                  ? "bg-green-600 hover:bg-green-700 animate-pulse"
+                  : isSupabaseEnabled
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-blue-600 hover:bg-blue-700"
               } text-white transition-all duration-300`}
             >
               {connected ? (
                 <>
-                  <Zap className="w-3 h-3 mr-1" />
-                  Sincronizado
+                  <Database className="w-3 h-3 mr-1" />
+                  Supabase Online
+                </>
+              ) : isSupabaseEnabled ? (
+                <>
+                  <WifiOff className="w-3 h-3 mr-1" />
+                  Desconectado
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3 h-3 mr-1" />
-                  Offline
+                  <HardDrive className="w-3 h-3 mr-1" />
+                  Modo Local
                 </>
               )}
             </Badge>
@@ -206,17 +203,45 @@ export default function AdminPage() {
         </div>
 
         {/* Informações de Sincronização */}
-        {connected && lastUpdate && (
+        {isSupabaseEnabled && (
           <div className="mb-6">
-            <Card className="bg-green-900/20 border-green-500/30">
+            <Card
+              className={connected ? "bg-green-900/20 border-green-500/30" : "bg-yellow-900/20 border-yellow-500/30"}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Zap className="w-4 h-4 text-green-400" />
-                    <span className="text-green-400 text-sm">Sistema de sincronização ativo</span>
+                    {connected ? (
+                      <>
+                        <Database className="w-4 h-4 text-green-400" />
+                        <span className="text-green-400 text-sm">Supabase Realtime ativo - Sincronização global</span>
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="w-4 h-4 text-yellow-400" />
+                        <span className="text-yellow-400 text-sm">Tentando reconectar ao Supabase...</span>
+                      </>
+                    )}
                   </div>
-                  <span className="text-xs text-green-300">
-                    Última sincronização: {lastUpdate.toLocaleTimeString()}
+                  {lastUpdate && (
+                    <span className="text-xs text-green-300">
+                      Última sincronização: {lastUpdate.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {!isSupabaseEnabled && (
+          <div className="mb-6">
+            <Card className="bg-blue-900/20 border-blue-500/30">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <HardDrive className="w-4 h-4 text-blue-400" />
+                  <span className="text-blue-400 text-sm">
+                    Modo local ativo - Para sincronização global, configure o Supabase
                   </span>
                 </div>
               </CardContent>
@@ -241,23 +266,15 @@ export default function AdminPage() {
           </TabsList>
 
           <TabsContent value="products">
-            <ProductsManager
-              categories={categories}
-              products={products}
-              onUpdate={() => handleDataUpdate("products")}
-            />
+            <ProductsManager categories={categories} products={products} onUpdate={loadData} />
           </TabsContent>
 
           <TabsContent value="appearance">
-            <AppearanceManager
-              settings={settings}
-              appearance={appearance}
-              onUpdate={() => handleDataUpdate("appearance")}
-            />
+            <AppearanceManager settings={settings} appearance={appearance} onUpdate={loadData} />
           </TabsContent>
 
           <TabsContent value="settings">
-            <SettingsManager settings={settings} onUpdate={() => handleDataUpdate("settings")} />
+            <SettingsManager settings={settings} onUpdate={loadData} />
           </TabsContent>
         </Tabs>
       </div>

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { LocalStorageService } from "@/lib/local-storage"
+import { DatabaseService } from "@/lib/database-service"
 import type { Category, Product } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -101,14 +101,14 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
 
     try {
       if (editingProduct) {
-        LocalStorageService.saveProduct({
+        await DatabaseService.saveProduct({
           ...productData,
           id: editingProduct.id,
           created_at: editingProduct.created_at,
           updated_at: new Date().toISOString(),
         })
       } else {
-        LocalStorageService.saveProduct(productData)
+        await DatabaseService.saveProduct(productData)
       }
 
       onUpdate()
@@ -122,7 +122,7 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
   const handleDelete = async (id: number) => {
     if (confirm("Tem certeza que deseja excluir este produto?")) {
       try {
-        LocalStorageService.deleteProduct(id)
+        await DatabaseService.deleteProduct(id)
         onUpdate()
       } catch (error) {
         console.error("Erro ao excluir produto:", error)
