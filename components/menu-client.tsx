@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { Category, Product, Settings } from "@/types"
 import { CartProvider } from "@/contexts/cart-context"
 import Header from "@/components/header"
@@ -8,6 +8,8 @@ import CategorySection from "@/components/category-section"
 import Cart from "@/components/cart"
 import { Button } from "@/components/ui/button"
 import { ShoppingCart } from "lucide-react"
+import { LocalStorageService } from "@/lib/local-storage"
+import type { AppearanceSettings } from "@/lib/local-storage"
 
 interface MenuClientProps {
   categories: Category[]
@@ -17,6 +19,11 @@ interface MenuClientProps {
 
 export default function MenuClient({ categories, products, settings }: MenuClientProps) {
   const [showCart, setShowCart] = useState(false)
+  const [appearance, setAppearance] = useState<AppearanceSettings | null>(null)
+
+  useEffect(() => {
+    setAppearance(LocalStorageService.getAppearance())
+  }, [])
 
   if (!settings?.is_open) {
     return (
@@ -33,12 +40,15 @@ export default function MenuClient({ categories, products, settings }: MenuClien
     <CartProvider>
       <div className="min-h-screen bg-black text-white relative">
         {/* Background Image */}
-        <div
-          className="fixed inset-0 bg-cover bg-center opacity-10"
-          style={{
-            backgroundImage: "url('/placeholder.svg?height=800&width=1200')",
-          }}
-        />
+        {appearance?.background_image && (
+          <div
+            className="fixed inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${appearance.background_image})`,
+              opacity: appearance.background_opacity || 0.1,
+            }}
+          />
+        )}
 
         <div className="relative z-10">
           <Header settings={settings} />

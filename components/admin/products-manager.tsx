@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Edit, Trash2, Package } from "lucide-react"
+import { Plus, Edit, Trash2, Package, Upload, Loader2 } from "lucide-react"
+import { GoogleUploadService } from "@/lib/google-upload"
+import Image from "next/image"
 
 interface ProductsManagerProps {
   categories: Category[]
@@ -30,7 +32,9 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
     category_id: "",
     stock_quantity: "",
     is_available: true,
+    image_url: "/placeholder.svg?height=200&width=300",
   })
+  const [uploadingProduct, setUploadingProduct] = useState<number | null>(null)
 
   const resetForm = () => {
     setFormData({
@@ -40,6 +44,7 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
       category_id: "",
       stock_quantity: "",
       is_available: true,
+      image_url: "/placeholder.svg?height=200&width=300",
     })
     setEditingProduct(null)
     setShowForm(false)
@@ -54,8 +59,30 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
       category_id: product.category_id.toString(),
       stock_quantity: product.stock_quantity.toString(),
       is_available: product.is_available,
+      image_url: product.image_url || "/placeholder.svg?height=200&width=300",
     })
     setShowForm(true)
+  }
+
+  const handleProductImageUpload = async (file: File, productId?: number) => {
+    const validation = GoogleUploadService.validateImageFile(file)
+    if (!validation.valid) {
+      alert(validation.error)
+      return null
+    }
+
+    setUploadingProduct(productId || 0)
+
+    try {
+      const imageUrl = await GoogleUploadService.uploadImage(file, "products")
+      setUploadingProduct(null)
+      return imageUrl
+    } catch (error) {
+      console.error("Erro no upload:", error)
+      alert("Erro ao fazer upload da imagem")
+      setUploadingProduct(null)
+      return null
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,7 +95,7 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
       category_id: Number.parseInt(formData.category_id),
       stock_quantity: Number.parseInt(formData.stock_quantity),
       is_available: formData.is_available,
-      image_url: "/placeholder.svg?height=200&width=300",
+      image_url: formData.image_url,
       display_order: 0,
     }
 
@@ -224,6 +251,58 @@ export default function ProductsManager({ categories, products, onUpdate }: Prod
                     placeholder="0"
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="product-image">Foto do Produto</Label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    id="product-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        const imageUrl = await handleProductImageUpload(file)
+                        if (imageUrl) {
+                          setFormData({ ...formData, image_url: imageUrl })
+                        }
+                      }
+                      e.target.value = ""
+                    }}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => document.getElementById("product-image")?.click()}
+                    disabled={uploadingProduct === 0}
+                    variant="outline"
+                    className="border-gray-600"
+                  >
+                    {uploadingProduct === 0 ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Escolher Foto
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {formData.image_url && (
+                  <div className="mt-2">
+                    <Image
+                      src={formData.image_url || "/placeholder.svg"}
+                      alt="Preview"
+                      width={100}
+                      height={100}
+                      className="rounded border border-gray-600 object-cover"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
